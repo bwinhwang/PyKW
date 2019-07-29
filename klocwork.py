@@ -23,6 +23,11 @@ import urllib.request
 import urllib.parse
 import urllib
 
+__author__ = "bwinhwang@gmail.com"
+__all__ = ['Build', 'Issue', 'KWServer', 'Metric', 'MetricsStatistics',
+        'Project', 'User', 'View', ]
+
+
 # validate Python version
 if sys.version_info.major != 3:
     print("PyKW requires Python 3")
@@ -32,42 +37,103 @@ elif sys.version_info.minor < 5:
     sys.exit(1)
 
 
-class Issue:
+class Utils:
 
-    __slots__ = ['id', 'message', 'file', 'method', 'code', 'severity', 'title',
-    'severityCode', 'state', 'status', 'taxonomyName', 'url',
-    'created', 'owner', '_project']
+    @staticmethod
+    def toString(param):
+        if isinstance(param, list) or isinstance(param, tuple):
+            new = ','.join(map(str, param))
+        else:
+            new = str(param)
 
-    def __init__(self, project, issue):
-        self.id = issue["id"]
-        self.message = issue["message"]
-        self.file = issue["file"]
-        self.method = issue["method"]
-        self.code = issue["code"]
-        self.severity = issue["severity"]
-        self.title = issue['title']
-        self.severityCode = issue["severityCode"]
-        self.state = issue["state"]
-        self.status = issue["status"]
-        self.taxonomyName = issue["taxonomyName"]
-        self.url = issue["url"]
-        self.created = time.ctime(issue["dateOriginated"]/1000)
-        self.owner = issue["owner"]
-        self._project = project
+        return new
+
+
+class BaseObject:
 
     def __str__(self):
-        return 'id: {0}|severity: {1}|state: {2}'.format(self.id, self.severity, self.state)
+
+        if hasattr(self, 'name'):
+            return self.name
+        if hasattr(self, 'id'):
+            return str(self.id)
+        if hasattr(self, 'tag'):
+            return str(self.tag)
+
+        return self.__class__.__name__
 
     def __repr__(self):
-        return str(self.id)
+        return self.__str__()
+
+    def __getattr__(self, attr):
+        ''' tags if quite common in various objects'''
+        if attr == 'tags':
+            return []
+        else:
+            raise AttributeError(attr)
+
+
+class JSONObject(BaseObject):
+
+    def __init__(self, dict):
+        vars(self).update(dict)
+
+
+class User(JSONObject):
+
+    __all__ = ['name', 'readonly', 'roles', 'groups']
+
+    def getProjectsAsAdmin(self):
+
+        return [p['projectId'] for p in self.roles if p['name'] == 'Project admin']
+
+
+class Issue(JSONObject):
+
+    __all__ = ['id', 'message', 'file', 'method', 'code', 'severity', 'title',
+    'severityCode', 'state', 'status', 'taxonomyName', 'url',
+    'created', 'owner','dateOriginated', 'project']
+
+    def __init__(self, project, json_object):
+        JSONObject.__init__(self, json_object)
+        self.created = time.ctime(self.dateOriginated/1000)
+        self.project = project
 
     def __lt__(self, other):
         return self.id < self.id
 
     def getDetails(self):
 
-        data = {'action': 'issue_details', 'id': self.id}
-        return self._project.getItems(**data)[0]
+        try:
+            return self.details
+        except AttributeError:
+            data = {'action': 'issue_details', 'id': self.id}
+            self.details = self.project.getItems(**data)[0]
+
+        return self.details
+
+    def getName(self):
+        return self.getDetails()['name']
+
+    def getLocation(self):
+
+        return self.getDetails()['location']
+
+    def getStatus(self):
+        return self.status
+
+    def getState(self):
+
+        return self.getDetails()['state']
+
+    def getHistory(self):
+
+        data = self.getDetails()
+
+        if 'history' in data.keys():
+            return data['history'][0]['comment']
+        else:
+            return ''
 
     def update(self, owner=None, status=None, comment=None, bug_tracker_id=None):
 
@@ -81,62 +147,41 @@ class Issue:
             data.update({'comment': comment})
         if bug_tracker_id:
             data.update({'bug_tracker_id': bug_tracker_id})
-        
-        return self._project.setItems(**data)
+
+        return self.project.setItems(**data)
 
 
-class Metric:
-    def __init__(self, project, metric):
-        self.file = metric["filePath"]
-        self.entity = metric["entity"]
-        self.entity_id = metric['entity_id']
-        self.tag = metric["tag"]
-        self.value = metric["metricValue"]
+class Metric(JSONObject):
 
-    def __str__(self):
-        return self.tag + '  ' + str(self.value) + '  ' + self.file
+    __all__ = ['project', 'filePath', 'entity', 'entity_id', 'tag', 'metricValue']
 
-    def __lt__(self, other):
-        return self.tag < other.tag
-
-
-class MetricsStatistics:
-    def __init__(self, project, statistics):
-        self.tag = statistics['tag']
-        self.sum = statistics['sum']
-        self.max = statistics['max']
-        self.min = statistics['min']
-        self.entries = statistics['entries']
-
-    def __str__(self):
-        return self.tag
-
-    def __repr__(self):
-        return self.tag
-
-    def __lt__(self, other):
-        return self.tag < other.tag
-
-    def __eq__(self, other):
-        return self.tag == other.tag
-
-
-class View:
-
-    def __init__(self, project, view):
+    def __init__(self, project, json_object):
+        JSONObject.__init__(self, json_object)
         self.project = project
-        self.name = view['name']
-        self.creator = view['creator']
-        self.id = view['id']
-        self.query = view['query']
-        self.is_public = view['is_public']
-        self.tags = view['tags'] if 'tags' in view.keys() in view else None
 
-    def __str__(self):
-        return self.name
+    def __lt__(self, other):
+        return self.tag < other.tag
 
-    def __repr__(self):
-        return self.name
+
+class MetricsStatistics(JSONObject):
+
+    __all__ = ['project']
+
+    def __init__(self, project, json_object):
+        JSONObject.__init__(self, json_object)
+        self.project = project
+
+    def __lt__(self, other):
+        return self.tag < other.tag
+
+
+class View(JSONObject):
+
+    __all__ = ['project', 'name', 'creator', 'id', 'query', 'is_public', 'tags']
+
+    def __init__(self, project, json_object):
+        JSONObject.__init__(self, json_object)
+        self.project = project
 
     def getIssues(self, query=None):
         '''query='state:New,Existing'''
@@ -144,7 +189,7 @@ class View:
         if query:
             params.update({'query': query})
 
-        return self.project.getIssues(**params)
+        return self.project.search(**params)
 
     def getAllIssues(self):
         return self.getIssues(query="state:New,Existing,Fixed")
@@ -152,58 +197,74 @@ class View:
     def getNewIssues(self):
         return self.getIssues(query="state:New")
 
-    def update(self):
+    def doDelete(self):
+        data = {'action': 'delete_view', 'name': self.name}
+        return self.project.setItems(**data)
 
+    def doUpdate(self):
         data = {'action': 'update_view', 'name': self.name,
                 'query': self.query, 'is_public': self.is_public}
         if self.tags:
-            data.update({'tags', self.tags})
+            data.update({'tags', Utils.toString(self.tags)})
+
+        return self.project.setItems(**data)
+
+    def doCreate(self):
+        data = {'action': 'update_view', 'name': self.name,
+                'query': self.query, 'is_public': self.is_public}
+        if self.tags:
+            data.update({'tags', Utils.toString(self.tags)})
 
         return self.project.setItems(**data)
 
 
-class Build:
-    def __init__(self, project, build):
-        self._project = project
-        self.id = build['id']
-        self.name = build['name']
-        self.date = build['date']
-        self.keepit = build['keepit']
+class Build(JSONObject):
+
+    __all__ = ['project', 'id', 'name', 'date', 'keepit', 'created']
+
+    def __init__(self, project, json_object):
+        JSONObject.__init__(self, json_object)
+        self.project = project
         self.created = time.ctime(self.date/1000)
-
-    def __str__(self):
-        return 'id:{0} created on {1}'.format(self.id, self.created)
-
-    def __repr__(self):
-        return self.name
 
     def __lt__(self, other):
         return self.id < other.id
 
     def getDetails(self):
-        return self._project.getConfiguration(build=self.name)[0]
+        return self.project.getConfiguration(build=self.name)[0]
 
     def getIssues(self, query=None):
         build_query = "build:{}".format(self.name)
         if query:
             build_query = ' '.join([build_query, query])
 
-        return self._project.getIssues(query=build_query)
+        return self.project.search(query=build_query)
 
     def getNewIssues(self):
         return self.getIssues(query="state:New")
 
 
-class Module:
-    def __init__(self, project, module):
-        self.name = module['name']
-        self.paths = module['paths']
+class Module(JSONObject):
 
-    def __str__(self):
-        return self.name
+    __all__ = ['paths', 'name']
 
-    def __repr__(self):
-        return self.name
+    def __init__(self, project, json_object):
+        JSONObject.__init__(self, json_object)
+        self.project = project
+
+    def doCreate(self, **params):
+        self._action(action='create_module', **params)
+
+    def doUpdate(self, **params):
+        self._action(action='update_module', **params)
+
+    def doDelete(self):
+        self._action(action='delete_module')
+
+    def _action(self, **params):
+        data = {'name': self.name, 'paths': ','.join(self.paths)}
+        data.update(**params)
+        self.project.setItems(**data)
 
     def addPath(self, path):
         if path not in self.paths:
@@ -214,24 +275,13 @@ class Module:
             self.paths.remove(path)
 
 
-class Project:
+class Project(JSONObject):
 
-    def __init__(self, server, project):
+    __all__ = ['server', 'name', 'id', 'description', 'creator', 'tags']
+
+    def __init__(self, server, json_object):
+        JSONObject.__init__(self, json_object)
         self.server = server
-        self.name = project['name']
-        self.id = project['id']
-        self.description = project['description']
-        self.creator = project['creator']
-        self.tags = project['tags'] if 'tags' in project.keys() else []
-        self._views = []
-        self._modules = []
-        self._builds = []
-
-    def __str__(self):
-        return self.name
-
-    def __repr__(self):
-        return self.name
 
     def __hash__(self):
         return id(self)
@@ -270,16 +320,20 @@ class Project:
         kwargs.update({'project': self.name})
         return self.server.setItems(**kwargs)
 
+    def delete(self):
+        data = {'action': 'delete_project', 'name': self.name}
+        return self.setItems(**data)
+
     def update(self, newname=None, description=None, tags=None,
             auto_delete_builds=None, auto_delete_threshold=None):
 
-        data = {'action': 'update_project'}
+        data = {'action': 'update_project', 'name': self.name}
         if newname:
             data.update({'newname': newname})
         if description:
             data.update({'description': description})
         if tags:
-            data.update({'tags': tags})
+            data.update({'tags': Utils.toString(tags)})
         if auto_delete_builds:
             data.update({'auto_delete_builds': auto_delete_threshold})
         if auto_delete_threshold:
@@ -305,11 +359,10 @@ class Project:
         return self.getItems(**data)
 
     def getTaxonomies(self):
-        
         data = {'action': 'taxonomies'}
         return self.getItems(**data)
 
-    def getIssues(self, view=None, query=None, limit=None):
+    def search(self, view=None, query=None, limit=None):
 
         data = {'action': 'search'}
         if view:
@@ -320,6 +373,10 @@ class Project:
             data.update({'limit': limit})
 
         return self.getItems(self._issue_from_json, **data)
+
+    def getIssues(self, view=None, query=None, limit=None):
+
+        return self.search(view, query, limit)
 
     def updateIssues(self, ids, status=None, comment=None, owner=None, bug_tracker_id=None):
         data = {'action': 'update_status'}
@@ -352,7 +409,7 @@ class Project:
         data.update({'id': id})
 
         return self.getItems(**data)
-       
+
     def getMetrics(self, view=None, query=None, limit=None, aggregate=None):
 
         data = {'action': 'metrics'}
@@ -374,78 +431,47 @@ class Project:
 
         return self.getItems(self._metricstats_from_json, **data)
 
-    def getBuilds(self, force=False):
-
-        if not force and self._builds:
+    def getBuilds(self):
+        try:
             return self._builds
-
-        data = {'action': 'builds'}
-
-        self._builds = self.getItems(self._build_from_json, **data)
+        except AttributeError:
+            data = {'action': 'builds'}
+            self._builds = self.getItems(self._build_from_json, **data)
         return self._builds
 
-    def getBuild(self, name, force=False):
-
-        if not self._builds and not force:
-            self.getBuilds(force)
-
-        for build in self._builds:
+    def getBuild(self, name):
+        for build in self.getBuilds():
             if name == build.name:
                 return build
-
         return None
 
-    def getViews(self, force=False):
-
-        if not force and self._views:
+    def getViews(self):
+        try:
             return self._views
-
-        data = {'action': 'views'}
-        self._views = self.getItems(self._view_from_json, **data)
+        except AttributeError:
+            data = {'action': 'views'}
+            self._views = self.getItems(self._view_from_json, **data)
         return self._views
 
-    def getView(self, name, force=False):
-
-        if not self._views or force:
-            self.getViews(force)
-
-        for view in self._views:
+    def getView(self, name):
+        for view in self.getViews():
             if name == view.name:
                 return view
-
         return None
 
-    def createView(self, view):
-        pass
-
-    def updateView(self, view):
-        if self == view.project:
-            view.update()
-
-    def getModules(self, force=False):
-
-        if not force and self._modules:
+    def getModules(self):
+        try:
             return self._modules
-
-        data = {'action': 'modules'}
-        self._modules = self.getItems(self._module_from_json, **data)
+        except AttributeError:
+            data = {'action': 'modules'}
+            self._modules = self.getItems(self._module_from_json, **data)
         return self._modules
 
-    def getModule(self, name, force=False):
-        if not self._modules or force:
-            self.getModules(force)
-
-        for module in self._modules:
+    def getModule(self, name):
+        for module in self.getModules():
             if module.name == name:
                 return module
-
         return None
-
-    def createModule(self, module):
-        pass
-
-    def updateModule(self, module):
-        pass
 
     def getDefectsTypes(self):
 
@@ -502,25 +528,7 @@ class Project:
         if group_issues:
             data.update({'group_issues': group_issues})
 
-        return self.getItems(**data) 
-
-
-class User:
-    def __init__(self, user):
-        self.name = user['name']
-        self.readonly = user['readonly']
-        self.roles = user['roles']
-        self.groups = user['groups']
-
-    def __str__(self):
-        return self.name
-
-    def __repr__(self):
-        return self.name 
-
-    def getProjectsAsAdmin(self):
-
-        return [p['projectId'] for p in self.roles if p['name'] == 'Project admin']
+        return self.getItems(**data)
 
 
 class KWServer:
@@ -529,9 +537,6 @@ class KWServer:
         self._port = port
         self._user = user
         self._token = self._gettoken(host, port, user)
-        self._projects = []
-        self._users = []
-        self._version = None
         self._debug = debug
 
     def __str__(self):
@@ -586,7 +591,9 @@ class KWServer:
         return found_token
 
     def _getVersion(self):
-        if not self._version:
+        try:
+            return self._version
+        except AttributeError:
             versions = json.loads(self.getUrlRsp({'action': 'version'}).read().decode('utf-8'))
             self._version = versions['majorVersion']+'.'+versions['minorVersion']
         return self._version
@@ -673,28 +680,22 @@ class KWServer:
 
         return (result, exception)
 
-    def getUsers(self, force=None):
-
-        if not force and self._users:
-            return self._users
-
-        data = {'action': 'users'}
-        self._users = self.getItems(KWServer.user_from_json, **data)[1]
+    def getUsers(self):
+        try:
+            return self._user
+        except AttributeError:
+            data = {'action': 'users'}
+            self._users = self.getItems(KWServer.user_from_json, **data)[1]
 
         return self._users
 
-    def getProjects(self, force=False):
-        
-        if not force and self._projects:
+    def getProjects(self):
+        try:
             return self._projects
-
-        data = {'action': 'projects'}
-        self._projects = self.getItems(self._project_from_json, **data)[1]
-
+        except AttributeError:
+            data = {'action': 'projects'}
+            self._projects = self.getItems(self._project_from_json, **data)[1]
         return self._projects
-
-    # def getSummary(self):
-        # size = len(self.getProjects())
 
     def getProject(self, name):
 
