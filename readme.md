@@ -52,8 +52,6 @@ have a look into the project
 	[Build(id=115, name='2020-09-11-98', date=1615877561684, keepit=False), Build(id=114, name='2020-09-11-97', date=1615860867501, keepit=False)]
 	>>> p.getTaxonomies()
 	[{'name': 'C and C++', 'is_custom': False}, {'name': 'C#', 'is_custom': False}, {'name': 'Java', 'is_custom': False}, {'name': 'MISRA Checkers Package', 'is_custom': False}]
-	>>> p.getModules()
-	[*default*, external_code, generated_code, test_code]
 
 search issues
 
