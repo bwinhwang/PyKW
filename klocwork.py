@@ -50,16 +50,18 @@ class Utils:
 
 _User = namedtuple('User', ['name', 'readonly', 'roles', 'groups'])
 
-_Issue = namedtuple("Issue", ['id', 'message', 'file', 
-    'method', 'code', 'severity', 'title', 'severityCode', 'state', 'status', 
-    'taxonomyName', 'url', 'owner','dateOriginated',"issueIds"])
+_Issue = namedtuple("Issue", ['id', 'message', 'file',
+    'method', 'code', 'severity', 'title', 'severityCode', 'state', 'status',
+    'taxonomyName', 'url', 'owner','supportLevel','supportLevelCode', 'dateOriginated',"issueIds"])
 
-_IssueDetails = namedtuple("IssueDetails", ['id', 'code', 'name', 'location', 'build', 
+_IssueDetails = namedtuple("IssueDetails", ['id', 'code', 'name', 'location', 'build',
     'severity', 'owner', 'state', 'status', 'history'], defaults=[''])
 
-_Metric = namedtuple("Metric", ['project', 'filePath', 'entity', 'entity_id', 'tag', 'metricValue'])
+_Metric = namedtuple("Metric", ['filePath', 'entity', 'entity_id', 'tag', 'metricValue'],
+        defaults=[''])
 
-_MetricsStatistics = namedtuple("MetricsStatistics",['project', 'tag', 'sum', 'min', 'max', 'entries'])
+_MetricsStatistics = namedtuple("MetricsStatistics",['tag', 'sum', 'min', 'max', 'entries'],
+        defaults=[''])
 
 _View = namedtuple("View", ['name', 'creator', 'id', 'query', 'is_public', 'tags'], defaults=[''])
 
@@ -67,8 +69,8 @@ _Build = namedtuple("Build",  ['id', 'name', 'date', 'keepit'])
 
 _Module = namedtuple("Module", ['paths', 'name'])
 
-_Project = namedtuple('Project',  ['server', 'name', 'id', 'description', 'creator', 'tags'],
-            defaults = [''])
+_Project = namedtuple('Project',  ['server', 'name', 'id', 'creator', 'description', 'tags'],
+            defaults = ['',''])
 
 def _item_from_json(_object, json_object):
     return _object(**json_object)
@@ -83,6 +85,9 @@ class Project(_Project):
 
     def __lt__(self, other):
         return self.name < other.name
+
+    def __repr__(self):
+        return self.name
 
     def getItems(self, json_hook=None, **kwargs):
 
@@ -171,10 +176,12 @@ class Project(_Project):
         data = {'action': 'issue_details'}
         data.update({'id': issue.id})
 
-        return self.getItems(partial(_item_from_json, _IssueDetails), **data)     
+        return self.getItems(partial(_item_from_json, _IssueDetails), **data)
 
     def getMetrics(self, view=None, query=None, limit=None, aggregate=None):
-
+        """
+        return results by query
+        """
         data = {'action': 'metrics'}
         if view:
             if isinstance(view, _View):
@@ -190,8 +197,13 @@ class Project(_Project):
 
         return self.getItems(partial(_item_from_json, _Metric), **data)
 
-    def getMetricsTotal(self, view=None):
+    def getMetricsTotal(self, query=None, view=None):
+        """
+        return the whole aggregated metrics
+        """
         data = {'action': 'metrics', 'aggregate': 'True'}
+        if query:
+            data.update({'query': query})
         if view:
             data.update({'view': view})
 
@@ -202,7 +214,7 @@ class Project(_Project):
             return self._builds
         except AttributeError:
             data = {'action': 'builds'}
-             
+
             self._builds = self.getItems(partial(_item_from_json, _Build), **data)
         return self._builds
 
@@ -247,7 +259,7 @@ class Project(_Project):
 
     def getServer(self):
         return self.server
-    
+
     def doCreation(self):
         pass
 

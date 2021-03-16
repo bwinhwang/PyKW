@@ -7,24 +7,19 @@ import asyncio
 
 
 async def getMetrics(loop, project):
-    builds = await loop.run_in_executor(None, project.getBuilds)
-    if builds:
-        builds.sort()
-        latest = builds[-1]
-        issues = await loop.run_in_executor(None, latest.getNewIssues)
-        return (project, issues)
-    return (project, None)
+    issues = await loop.run_in_executor(None, project.getIssues)
+    return (project, issues)
 
 def main(server):
 
-    #projects = [p for p in server.getProjects() if 'x-report' in p.tags]
-    projects = server.getProjects()
+    projects = [p for p in server.getProjects() if 'x-report' in p.tags]
+    #projects = server.getProjects()
     metrics = []
 
     executor = concurrent.futures.ThreadPoolExecutor()
     loop = asyncio.get_event_loop()
     loop.set_default_executor(executor)
-     
+
     futures = []
 
     for p in projects:
@@ -33,7 +28,7 @@ def main(server):
 
     coro = asyncio.wait(futures)
     results = loop.run_until_complete(coro)
-   
+
     for r in results[0]:
         result = r.result()
         if isinstance(result[1], list):
