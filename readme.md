@@ -4,7 +4,7 @@ PyKW is a Python wrapper of Klocwork Web API which gives you the ability to orga
 
 ## Getting Started
 ### Prerequisites
-* Python3.5 or later
+* Python3.7 or later
 
 * Make a sucessful login to the Klocwork server so proper credential is generated in your $HOME/.klocwork directory which will be read by PyKW. 
 
@@ -25,8 +25,8 @@ $ cp klocwork.py myworkspace/
 Please start the interpreter from the directory where file 'klocwork.py' exists   
 
     $ python3
-	Python 3.5.2 (default, Nov 23 2017, 16:37:01) 
-	[GCC 5.4.0 20160609] on linux
+	Python 3.8.5 (default, Jan 27 2021, 15:41:15)
+	[GCC 9.3.0] on linux
 	Type "help", "copyright", "credits" or "license" for more information.
 	>>> import klocwork
 
@@ -34,45 +34,31 @@ create the server instance
 
 	>>> s=klocwork.KWServer()
 	>>> print(s)
-	Login as wbh at Klocwork server(19.1.0) http://10.57.69.62:8080
+	Login as wbh at Klocwork server(20.3.0) http://10.70.9.61:8080
 
 get whole projects
 
 	>>> s.getProjects()
-	[onlineservices__cns-applications, onlineservices__tsd-onlineservices-webapp-storage, sal__tsd-sal-carplay, ...]
+	[mqb_sop2_bm_basic-services__common-base__common-base, onlineservices__cns-applications, onlineservices__tsd-onlineservices-webapp-storage, sal__tsd-sal-carplay, ...]
 get a special project
 
-	>>> p=s.getProject('onlineservices__cns-applications')
+	>>> p=s.getProject('mqb_sop2_bm_basic-services__common-base__common-base')
 
 have a look into the project
 
 	>>> p.getViews()
 	[*default*, critical, external code, generated code, metrics, misra, porting, zerofindings]
 	>>> p.getBuilds()
-	[2019-07-17-26, 2019-07-11-25, 2019-07-08-23]
+	[Build(id=115, name='2020-09-11-98', date=1615877561684, keepit=False), Build(id=114, name='2020-09-11-97', date=1615860867501, keepit=False)]
 	>>> p.getTaxonomies()
 	[{'name': 'C and C++', 'is_custom': False}, {'name': 'C#', 'is_custom': False}, {'name': 'Java', 'is_custom': False}, {'name': 'MISRA Checkers Package', 'is_custom': False}]
 	>>> p.getModules()
 	[*default*, external_code, generated_code, test_code]
 
-have a look into a build
+search issues
 
-	>>> b=p.getBuild('2019-07-17-26')
-	>>> b.getDetails()
-	{'taxonomies': 'C and C++, MISRA Checkers Package, Metrics', 'build': '2019-07-17-26', 'linesOfCode': '49741', 'numberOfEntities': '141956', 'creationDate': 'Wed Jul 17 23:42:46 HKT 2019', 'version': '19.1.0.57', 'linesOfComments': '8339', 'numberOfClasses': '24178', 'numberOfFunctions': '11379', 'cFilesAnalyzed': '349', 'numberOfFiles': '1638', 'systemFilesAnalyzed': '1289'}
-
-get the list of new issues found in this build
-
-	>>> b.getIssues(query="state:New")
-	[44995, 46736, 46737, 46738, 46739, 46740, 46741, 46742, 46743, 46744, ...]
-
-give a summary of issues whose severity is 'critical'
-
-	>>> for i in b.getIssues(query='severity:Critical'):
-	...   print(i.getDetails())
-	... 
-	{'code': 'ABV.GENERAL', 'build': '2019-07-17-26', 'severity': 'Critical (1)', 'name': 'Buffer Overflow - Array Index Out of Bounds', 'status': 'Analyze', 'state': 'Existing', 'location': 'project_base/1/workspace/tsd.onlineservices.applications/src/PersistentConnectionMessage/MqttDispatcher/MqttHeaderBodyPackaging.cpp', 'id': '27593', 'owner': 'unowned'}
-	>>>
+	>>> p.getIssues(query="state:New")
+	[...]
  
 
 
